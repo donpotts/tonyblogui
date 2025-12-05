@@ -1,0 +1,134 @@
+@page "/register"
+@using TonyBlogUI.Client.Services
+@using TonyBlogUI.Shared
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Register - Tony Blog UI</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <i class="bi bi-person-plus text-primary" style="font-size: 3rem;"></i>
+                    <h2 class="mt-2">Create Account</h2>
+                    <p class="text-muted">Join us today</p>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        @errorMessage
+                        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                    </div>
+                }
+
+                <EditForm Model="registerRequest" OnValidSubmit="HandleRegister" FormName="registerForm">
+                    <DataAnnotationsValidator />
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">First Name</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <InputText class="form-control" @bind-Value="registerRequest.FirstName" placeholder="First name" />
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Last Name</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <InputText class="form-control" @bind-Value="registerRequest.LastName" placeholder="Last name" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                            <InputText class="form-control" @bind-Value="registerRequest.Email" placeholder="Enter your email" />
+                        </div>
+                        <ValidationMessage For="@(() => registerRequest.Email)" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                            <InputText type="password" class="form-control" @bind-Value="registerRequest.Password" placeholder="Create a password" />
+                        </div>
+                        <ValidationMessage For="@(() => registerRequest.Password)" class="text-danger" />
+                        <div class="form-text">At least 6 characters with uppercase, lowercase, and a digit</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Confirm Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                            <InputText type="password" class="form-control" @bind-Value="registerRequest.ConfirmPassword" placeholder="Confirm your password" />
+                        </div>
+                        <ValidationMessage For="@(() => registerRequest.ConfirmPassword)" class="text-danger" />
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Creating account...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-person-plus me-2"></i>
+                                <span>Create Account</span>
+                            }
+                        </button>
+                    </div>
+                </EditForm>
+
+                <hr class="my-4" />
+
+                <div class="text-center">
+                    <p class="mb-0">Already have an account? <a href="/login" class="text-primary">Sign In</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterRequest registerRequest = new();
+    private string? errorMessage;
+    private bool isLoading = false;
+
+    private async Task HandleRegister()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var result = await AuthService.RegisterAsync(registerRequest);
+
+            if (result.Success)
+            {
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Registration failed";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

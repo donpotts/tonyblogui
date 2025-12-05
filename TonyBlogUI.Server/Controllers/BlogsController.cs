@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TonyBlogUI.Server.Services;
 using TonyBlogUI.Shared;
@@ -6,6 +7,7 @@ namespace TonyBlogUI.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class BlogsController : ControllerBase
 {
     private readonly GoogleSheetsService _sheetsService;

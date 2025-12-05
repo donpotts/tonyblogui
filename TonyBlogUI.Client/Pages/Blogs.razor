@@ -1,4 +1,6 @@
 @page "/blogs"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
 @inject HttpClient Http
 @inject IJSRuntime JS
 @using CsvHelper

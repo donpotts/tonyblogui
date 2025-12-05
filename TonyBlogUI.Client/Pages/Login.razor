@@ -1,0 +1,107 @@
+@page "/login"
+@using TonyBlogUI.Client.Services
+@using TonyBlogUI.Shared
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Login - Tony Blog UI</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <i class="bi bi-person-circle text-primary" style="font-size: 3rem;"></i>
+                    <h2 class="mt-2">Welcome Back</h2>
+                    <p class="text-muted">Sign in to your account</p>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        @errorMessage
+                        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                    </div>
+                }
+
+                <EditForm Model="loginRequest" OnValidSubmit="HandleLogin" FormName="loginForm">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                            <InputText class="form-control" @bind-Value="loginRequest.Email" placeholder="Enter your email" />
+                        </div>
+                        <ValidationMessage For="@(() => loginRequest.Email)" class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                            <InputText type="password" class="form-control" @bind-Value="loginRequest.Password" placeholder="Enter your password" />
+                        </div>
+                        <ValidationMessage For="@(() => loginRequest.Password)" class="text-danger" />
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Signing in...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-box-arrow-in-right me-2"></i>
+                                <span>Sign In</span>
+                            }
+                        </button>
+                    </div>
+                </EditForm>
+
+                <hr class="my-4" />
+
+                <div class="text-center">
+                    <p class="mb-0">Don't have an account? <a href="/register" class="text-primary">Register</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginRequest loginRequest = new();
+    private string? errorMessage;
+    private bool isLoading = false;
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(loginRequest);
+
+            if (result.Success)
+            {
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = result.Message ?? "Login failed";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

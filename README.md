@@ -1,6 +1,6 @@
 # 📝 Tony Blog UI
 
-A modern Blazor WebAssembly application for managing keyword clusters, powered by Google Sheets as a backend database.
+A modern Blazor WebAssembly application for managing keyword clusters, powered by Google Sheets as a backend database with JWT authentication.
 
 ![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet)
 ![Blazor](https://img.shields.io/badge/Blazor-WebAssembly-512BD4?style=flat-square&logo=blazor)
@@ -8,11 +8,16 @@ A modern Blazor WebAssembly application for managing keyword clusters, powered b
 
 ## ✨ Features
 
+- 🔐 **JWT Authentication** - Secure login, registration, and password management
 - 📊 **Google Sheets Integration** - Use Google Sheets as your database with full CRUD operations
+- 📥 **Import/Export** - Import and export data via CSV and Excel files
 - 🎨 **Modern UI** - Clean, responsive design with smooth animations
 - ⚡ **Blazor WebAssembly** - Fast, client-side rendering with C#
 - 🔒 **Secure Configuration** - Credentials stored safely in User Secrets
 - 📱 **Responsive Design** - Works seamlessly on desktop and mobile
+- 👤 **User Roles** - Admin and User roles with role-based authorization
+- 🚦 **Rate Limiting** - Built-in API rate limiting with multiple policies
+- 📄 **OpenAPI Documentation** - Interactive API docs with Scalar UI
 
 ## 🏗️ Architecture
 
@@ -20,12 +25,14 @@ A modern Blazor WebAssembly application for managing keyword clusters, powered b
 TonyBlogUI/
 ├── TonyBlogUI.Client/       # Blazor WebAssembly frontend
 │   ├── Layout/              # Main layout and navigation
-│   ├── Pages/               # Razor pages (Home, Blogs)
+│   ├── Pages/               # Razor pages (Home, Blogs, Login, Register, etc.)
+│   ├── Services/            # Auth services and state management
 │   └── wwwroot/             # Static assets and CSS
 ├── TonyBlogUI.Server/       # ASP.NET Core API backend
-│   ├── Controllers/         # API endpoints
+│   ├── Controllers/         # API endpoints (Auth, Blogs)
+│   ├── Data/                # Entity Framework DbContext and Identity
 │   └── Services/            # Google Sheets service
-└── TonyBlogUI.Shared/       # Shared models and interfaces
+└── TonyBlogUI.Shared/       # Shared models, DTOs, and interfaces
 ```
 
 ## 🚀 Getting Started
@@ -50,6 +57,7 @@ TonyBlogUI/
    dotnet user-secrets init
    dotnet user-secrets set "GoogleSheets:Credentials" "<your-json-credentials>"
    dotnet user-secrets set "GoogleSheets:SpreadsheetId" "<your-spreadsheet-id>"
+   dotnet user-secrets set "Jwt:Key" "<your-secret-key-at-least-32-chars>"
    ```
 
 3. **Run the application**
@@ -61,6 +69,22 @@ TonyBlogUI/
    ```
    https://localhost:5001
    ```
+
+## 🔐 Authentication
+
+### Default Users (Development)
+
+The application seeds two default users for testing:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@example.com | testUser123! |
+| User | user@example.com | testUser123! |
+
+### JWT Token
+- Tokens are stored in localStorage
+- Token expiration: 30 days
+- Tokens include user roles for authorization
 
 ## 📋 Google Sheet Setup
 
@@ -78,7 +102,43 @@ Create a Google Sheet with the following columns in a sheet named `Pillar #1`:
 
 > **Note:** Share your Google Sheet with the service account email address.
 
+## 📥 Import/Export
+
+### Supported Formats
+- **CSV** - Comma-separated values
+- **Excel** - .xlsx files (using ClosedXML)
+
+### Export Columns
+Exports include all fields with Id as the first column:
+1. Id
+2. ClusterName
+3. Intent
+4. Keywords (semicolon-separated)
+5. PrimaryKeyword
+6. Completed
+7. Url
+
 ## 🔧 Configuration
+
+### appsettings.json
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=TonyBlogUI.db"
+  },
+  "Jwt": {
+    "Key": "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
+    "Issuer": "TonyBlogUI",
+    "Audience": "TonyBlogUI",
+    "ExpireDays": "30"
+  },
+  "GoogleSheets": {
+    "Credentials": "",
+    "SpreadsheetId": ""
+  }
+}
+```
 
 ### Development (User Secrets)
 
@@ -87,6 +147,9 @@ Create a Google Sheet with the following columns in a sheet named `Pillar #1`:
   "GoogleSheets": {
     "Credentials": "{...service account JSON...}",
     "SpreadsheetId": "your-spreadsheet-id"
+  },
+  "Jwt": {
+    "Key": "your-super-secret-key-for-jwt-tokens"
   }
 }
 ```
@@ -96,6 +159,7 @@ Create a Google Sheet with the following columns in a sheet named `Pillar #1`:
 ```bash
 GoogleSheets__Credentials="{...}"
 GoogleSheets__SpreadsheetId="your-spreadsheet-id"
+Jwt__Key="your-production-secret-key"
 ```
 
 ## 🛠️ Tech Stack
@@ -104,19 +168,80 @@ GoogleSheets__SpreadsheetId="your-spreadsheet-id"
 |------------|---------|
 | **Blazor WebAssembly** | Frontend framework |
 | **ASP.NET Core** | Backend API |
-| **Google Sheets API** | Database storage |
+| **ASP.NET Core Identity** | Authentication & user management |
+| **JWT Bearer** | Token-based authentication |
+| **Entity Framework Core** | ORM for SQLite database |
+| **SQLite** | User database storage |
+| **Google Sheets API** | Blog data storage |
+| **CsvHelper** | CSV import/export |
+| **ClosedXML** | Excel import/export |
 | **Bootstrap 5** | UI components |
 | **Bootstrap Icons** | Icon library |
+| **Blazored.LocalStorage** | Client-side storage |
 
 ## 📡 API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/blogs` | Get all keyword clusters |
-| `GET` | `/api/blogs/{id}` | Get cluster by ID |
-| `POST` | `/api/blogs` | Create new cluster |
-| `PUT` | `/api/blogs/{id}` | Update cluster |
-| `DELETE` | `/api/blogs/{id}` | Delete cluster |
+### Authentication
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/api/auth/register` | Register new user | No |
+| `POST` | `/api/auth/login` | Login and get JWT token | No |
+| `POST` | `/api/auth/change-password` | Change password | Yes |
+| `GET` | `/api/auth/me` | Get current user info | Yes |
+
+### Blogs
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `GET` | `/api/blogs` | Get all keyword clusters | Yes |
+| `GET` | `/api/blogs/{id}` | Get cluster by ID | Yes |
+| `POST` | `/api/blogs` | Create new cluster | Yes |
+| `PUT` | `/api/blogs/{id}` | Update cluster | Yes |
+| `DELETE` | `/api/blogs/{id}` | Delete cluster | Yes |
+
+## 📖 API Documentation
+
+Scalar API documentation is available in development mode:
+- **Scalar UI**: `https://localhost:5001/scalar/v1`
+- **OpenAPI Spec**: `https://localhost:5001/openapi/v1.json`
+
+The API documentation includes:
+- JWT Bearer authentication support
+- Interactive "Try it out" functionality
+- All endpoint schemas and examples
+
+## 🚦 Rate Limiting
+
+The API includes built-in rate limiting to protect against abuse. Four rate limiting policies are available:
+
+| Policy | Description | Limits |
+|--------|-------------|--------|
+| **Fixed** | Fixed window rate limiter | 100 requests per minute |
+| **Sliding** | Sliding window rate limiter | 4 requests per 10 seconds |
+| **Token** | Token bucket rate limiter | 4 tokens, replenishes 4 tokens every 10 seconds |
+| **Concurrency** | Concurrent request limiter | 10 concurrent requests |
+
+### Applying Rate Limits
+
+Use the `[EnableRateLimiting]` attribute on controllers or actions:
+
+```csharp
+[EnableRateLimiting("Fixed")]
+[ApiController]
+[Route("api/[controller]")]
+public class MyController : ControllerBase
+{
+    // ...
+}
+```
+
+### Rate Limit Response
+
+When rate limited, the API returns:
+- **Status Code**: `429 Too Many Requests`
+- **Header**: `Retry-After` with seconds to wait
+- **Body**: User-friendly message with retry information
 
 ## 🎯 Customization
 
@@ -144,6 +269,21 @@ private static readonly Dictionary<string, string> HeaderToPropertyMap = new()
     { "Your Column Name", "PropertyName" }
 };
 ```
+
+## 🔒 Security Notes
+
+- Change the default JWT key in production
+- Use HTTPS in production
+- Consider using Azure Key Vault or similar for secrets management
+- The SQLite database stores user credentials (hashed passwords)
+- In development, the database is recreated on each startup to apply seed data
+- Rate limiting helps protect against brute force and DDoS attacks
+
+---
+
+## 📬 Contact
+
+Don Potts - Don.Potts@DonPotts.com
 
 ---
 
