@@ -1,6 +1,12 @@
 @page "/blogs"
 @inject HttpClient Http
 @inject IJSRuntime JS
+@using CsvHelper
+@using CsvHelper.Configuration
+@using System.Globalization
+@using System.Text
+@using System.IO
+@using ClosedXML.Excel
 
 <PageTitle>Blogs - Tony Blog UI</PageTitle>
 
@@ -11,11 +17,44 @@
     </div>
     @if (!isEditing && !showAddForm)
     {
-        <button class="btn btn-primary" @onclick="ShowAddForm">
-            <i class="bi bi-plus-lg me-2"></i>Add New
-        </button>
+        <div class="d-flex gap-2">
+            <div class="btn-group">
+                <button class="btn btn-outline-secondary" @onclick="TriggerCsvFileInput">
+                    <i class="bi bi-upload me-2"></i>Import CSV
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="TriggerExcelFileInput">
+                    <i class="bi bi-file-earmark-excel me-2"></i>Import Excel
+                </button>
+            </div>
+            @if (blogs != null && blogs.Any())
+            {
+                <div class="btn-group">
+                    <button class="btn btn-outline-primary" @onclick="ExportToCsv">
+                        <i class="bi bi-download me-2"></i>Export CSV
+                    </button>
+                    <button class="btn btn-outline-success" @onclick="ExportToExcel">
+                        <i class="bi bi-file-earmark-excel me-2"></i>Export Excel
+                    </button>
+                </div>
+            }
+            <button class="btn btn-primary" @onclick="ShowAddForm">
+                <i class="bi bi-plus-lg me-2"></i>Add New
+            </button>
+        </div>
     }
 </div>
+
+<InputFile id="csvFileInput" OnChange="ImportFromCsv" Accept=".csv" style="display: none;" />
+<InputFile id="excelFileInput" OnChange="ImportFromExcel" Accept=".xlsx,.xls" style="display: none;" />
+
+@if (importMessage != null)
+{
+    <div class="alert @(importSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+        <i class="bi @(importSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i>
+        @importMessage
+        <button type="button" class="btn-close" @onclick="ClearImportMessage"></button>
+    </div>
+}
 
 @if (blogs == null)
 {
@@ -332,6 +371,20 @@ else
     private string editKeywordsInput = string.Empty;
     private bool isEditing = false;
     private bool showAddForm = false;
+    private string? importMessage = null;
+    private bool importSuccess = false;
+
+    // CSV record class with Id as first field
+    private class BlogCsvRecord
+    {
+        public string Id { get; set; } = string.Empty;
+        public string ClusterName { get; set; } = string.Empty;
+        public string Intent { get; set; } = string.Empty;
+        public string Keywords { get; set; } = string.Empty;
+        public string PrimaryKeyword { get; set; } = string.Empty;
+        public bool Completed { get; set; }
+        public string Url { get; set; } = string.Empty;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -344,6 +397,236 @@ else
         isEditing = false;
         newBlog = new();
         keywordsInput = string.Empty;
+    }
+
+    private async Task TriggerCsvFileInput()
+    {
+        await JS.InvokeVoidAsync("triggerFileInput", "csvFileInput");
+    }
+
+    private async Task TriggerExcelFileInput()
+    {
+        await JS.InvokeVoidAsync("triggerFileInput", "excelFileInput");
+    }
+
+    private void ClearImportMessage()
+    {
+        importMessage = null;
+    }
+
+    private async Task ImportFromExcel(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file == null)
+                return;
+
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10MB max
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            using var workbook = new XLWorkbook(memoryStream);
+            var worksheet = workbook.Worksheets.First();
+            
+            var importedCount = 0;
+            var totalRows = 0;
+
+            // Find header row and column indices
+            var headerRow = worksheet.Row(1);
+            var columnMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            
+            var lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? 0;
+            for (int col = 1; col <= lastColumn; col++)
+            {
+                var headerValue = headerRow.Cell(col).GetString().Trim();
+                if (!string.IsNullOrEmpty(headerValue))
+                {
+                    columnMap[headerValue] = col;
+                }
+            }
+
+            // Read data rows (skip header)
+            var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 1;
+            for (int row = 2; row <= lastRow; row++)
+            {
+                var currentRow = worksheet.Row(row);
+                
+                // Skip empty rows
+                if (currentRow.IsEmpty())
+                    continue;
+
+                totalRows++;
+
+                var blog = new Blog
+                {
+                    ClusterName = GetCellValue(currentRow, columnMap, "ClusterName"),
+                    Intent = GetCellValue(currentRow, columnMap, "Intent"),
+                    Keywords = GetCellValue(currentRow, columnMap, "Keywords")
+                        .Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(k => k.Trim()).ToList(),
+                    PrimaryKeyword = GetCellValue(currentRow, columnMap, "PrimaryKeyword"),
+                    Completed = GetBoolCellValue(currentRow, columnMap, "Completed"),
+                    Url = GetCellValue(currentRow, columnMap, "Url")
+                };
+
+                var response = await Http.PostAsJsonAsync("api/blogs", blog);
+                if (response.IsSuccessStatusCode)
+                {
+                    importedCount++;
+                }
+            }
+
+            importSuccess = true;
+            importMessage = $"Successfully imported {importedCount} of {totalRows} blog(s) from Excel.";
+            await LoadBlogs();
+        }
+        catch (Exception ex)
+        {
+            importSuccess = false;
+            importMessage = $"Error importing Excel: {ex.Message}";
+            Console.WriteLine($"Exception importing Excel: {ex.Message}");
+        }
+    }
+
+    private string GetCellValue(IXLRow row, Dictionary<string, int> columnMap, string columnName)
+    {
+        if (columnMap.TryGetValue(columnName, out var colIndex))
+        {
+            return row.Cell(colIndex).GetString().Trim();
+        }
+        return string.Empty;
+    }
+
+    private bool GetBoolCellValue(IXLRow row, Dictionary<string, int> columnMap, string columnName)
+    {
+        if (columnMap.TryGetValue(columnName, out var colIndex))
+        {
+            var cellValue = row.Cell(colIndex).GetString().Trim().ToLowerInvariant();
+            return cellValue == "true" || cellValue == "yes" || cellValue == "1";
+        }
+        return false;
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (blogs == null || !blogs.Any())
+            return;
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Blogs");
+
+        // Add headers (Id first)
+        var headers = new[] { "Id", "ClusterName", "Intent", "Keywords", "PrimaryKeyword", "Completed", "Url" };
+        for (int i = 0; i < headers.Length; i++)
+        {
+            worksheet.Cell(1, i + 1).Value = headers[i];
+            worksheet.Cell(1, i + 1).Style.Font.Bold = true;
+            worksheet.Cell(1, i + 1).Style.Fill.BackgroundColor = XLColor.LightGray;
+        }
+
+        // Add data rows
+        for (int row = 0; row < blogs.Count; row++)
+        {
+            var blog = blogs[row];
+            worksheet.Cell(row + 2, 1).Value = blog.Id;
+            worksheet.Cell(row + 2, 2).Value = blog.ClusterName;
+            worksheet.Cell(row + 2, 3).Value = blog.Intent;
+            worksheet.Cell(row + 2, 4).Value = string.Join("; ", blog.Keywords);
+            worksheet.Cell(row + 2, 5).Value = blog.PrimaryKeyword;
+            worksheet.Cell(row + 2, 6).Value = blog.Completed;
+            worksheet.Cell(row + 2, 7).Value = blog.Url;
+        }
+
+        // Auto-fit columns
+        worksheet.Columns().AdjustToContents();
+
+        using var memoryStream = new MemoryStream();
+        workbook.SaveAs(memoryStream);
+        
+        var bytes = memoryStream.ToArray();
+        var base64 = Convert.ToBase64String(bytes);
+        var fileName = $"blogs-export-{DateTime.Now:yyyy-MM-dd}.xlsx";
+        
+        await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    private async Task ImportFromCsv(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file == null)
+                return;
+
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10MB max
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+
+            var records = csv.GetRecords<BlogCsvRecord>().ToList();
+            var importedCount = 0;
+
+            foreach (var record in records)
+            {
+                var blog = new Blog
+                {
+                    ClusterName = record.ClusterName,
+                    Intent = record.Intent,
+                    Keywords = record.Keywords.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(k => k.Trim()).ToList(),
+                    PrimaryKeyword = record.PrimaryKeyword,
+                    Completed = record.Completed,
+                    Url = record.Url
+                };
+
+                var response = await Http.PostAsJsonAsync("api/blogs", blog);
+                if (response.IsSuccessStatusCode)
+                {
+                    importedCount++;
+                }
+            }
+
+            importSuccess = true;
+            importMessage = $"Successfully imported {importedCount} of {records.Count} blog(s).";
+            await LoadBlogs();
+        }
+        catch (Exception ex)
+        {
+            importSuccess = false;
+            importMessage = $"Error importing CSV: {ex.Message}";
+            Console.WriteLine($"Exception importing CSV: {ex.Message}");
+        }
+    }
+
+    private async Task ExportToCsv()
+    {
+        if (blogs == null || !blogs.Any())
+            return;
+
+        var records = blogs.Select(b => new BlogCsvRecord
+        {
+            Id = b.Id,
+            ClusterName = b.ClusterName,
+            Intent = b.Intent,
+            Keywords = string.Join("; ", b.Keywords),
+            PrimaryKeyword = b.PrimaryKeyword,
+            Completed = b.Completed,
+            Url = b.Url
+        }).ToList();
+
+        using var memoryStream = new MemoryStream();
+        using var writer = new StreamWriter(memoryStream, Encoding.UTF8);
+        using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        
+        csv.WriteRecords(records);
+        await writer.FlushAsync();
+        
+        var bytes = memoryStream.ToArray();
+        var base64 = Convert.ToBase64String(bytes);
+        var fileName = $"blogs-export-{DateTime.Now:yyyy-MM-dd}.csv";
+        
+        await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, base64, "text/csv");
     }
 
     private async Task LoadBlogs()
