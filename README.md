@@ -4,12 +4,15 @@ A modern Blazor WebAssembly application for managing keyword clusters, powered b
 
 ![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?style=flat-square&logo=dotnet)
 ![Blazor](https://img.shields.io/badge/Blazor-WebAssembly-512BD4?style=flat-square&logo=blazor)
+![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?style=flat-square&logo=sqlite)
 ![Google Sheets](https://img.shields.io/badge/Backend-Google%20Sheets-34A853?style=flat-square&logo=googlesheets)
 
 ## ✨ Features
 
 - 🔐 **JWT Authentication** - Secure login, registration, and password management
 - 📊 **Google Sheets Integration** - Use Google Sheets as your database with full CRUD operations
+- 🗄️ **SQLite Database** - Local user authentication and identity storage
+- 👥 **User Management** - Admin users can create, edit, and delete user accounts
 - 📥 **Import/Export** - Import and export data via CSV and Excel files
 - 🎨 **Modern UI** - Clean, responsive design with smooth animations
 - ⚡ **Blazor WebAssembly** - Fast, client-side rendering with C#
@@ -25,11 +28,11 @@ A modern Blazor WebAssembly application for managing keyword clusters, powered b
 TonyBlogUI/
 ├── TonyBlogUI.Client/       # Blazor WebAssembly frontend
 │   ├── Layout/              # Main layout and navigation
-│   ├── Pages/               # Razor pages (Home, Blogs, Login, Register, etc.)
+│   ├── Pages/               # Razor pages (Home, Blogs, Users, Login, Register, etc.)
 │   ├── Services/            # Auth services and state management
 │   └── wwwroot/             # Static assets and CSS
 ├── TonyBlogUI.Server/       # ASP.NET Core API backend
-│   ├── Controllers/         # API endpoints (Auth, Blogs)
+│   ├── Controllers/         # API endpoints (Auth, Blogs, Users)
 │   ├── Data/                # Entity Framework DbContext and Identity
 │   └── Services/            # Google Sheets service
 └── TonyBlogUI.Shared/       # Shared models, DTOs, and interfaces
@@ -85,6 +88,68 @@ The application seeds two default users for testing:
 - Tokens are stored in localStorage
 - Token expiration: 30 days
 - Tokens include user roles for authorization
+
+## 👥 User Management
+
+Admin users have access to manage user accounts.
+
+### Features
+
+- **View Users**: Admin can view all users and their roles.
+- **Edit Users**: Admin can edit user details and roles.
+- **Delete Users**: Admin can delete user accounts.
+- **Password Reset**: Admin can reset passwords for users.
+
+## 🗄️ SQLite Database
+
+The application uses SQLite for storing user authentication data via ASP.NET Core Identity.
+
+### Database Location
+
+The database file `TonyBlogUI.db` is created in the server project directory.
+
+### Database Schema
+
+The SQLite database stores:
+- **Users** - User accounts with hashed passwords
+- **Roles** - User roles (Admin, User)
+- **User Roles** - User-to-role mappings
+- **User Claims** - Additional user claims (first name, last name)
+
+### Entity Framework Core
+
+The application uses Entity Framework Core with SQLite provider:
+
+```csharp
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+```
+
+### Database Initialization
+
+In development mode, the database is automatically recreated on each startup to apply seed data:
+
+```csharp
+if (app.Environment.IsDevelopment())
+{
+    dbContext.Database.EnsureDeleted();
+    dbContext.Database.EnsureCreated();
+}
+```
+
+> **Note:** In production, use Entity Framework migrations instead of `EnsureDeleted()`/`EnsureCreated()`.
+
+### Connection String
+
+Configure the database location in `appsettings.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=TonyBlogUI.db"
+  }
+}
+```
 
 ## 📋 Google Sheet Setup
 
@@ -189,6 +254,17 @@ Jwt__Key="your-production-secret-key"
 | `POST` | `/api/auth/login` | Login and get JWT token | No |
 | `POST` | `/api/auth/change-password` | Change password | Yes |
 | `GET` | `/api/auth/me` | Get current user info | Yes |
+
+### Users (Admin Only)
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `GET` | `/api/users` | Get all users | Yes (Admin) |
+| `GET` | `/api/users/{id}` | Get user by ID | Yes (Admin) |
+| `GET` | `/api/users/roles` | Get available roles | Yes (Admin) |
+| `POST` | `/api/users` | Create new user | Yes (Admin) |
+| `PUT` | `/api/users/{id}` | Update user | Yes (Admin) |
+| `DELETE` | `/api/users/{id}` | Delete user | Yes (Admin) |
 
 ### Blogs
 

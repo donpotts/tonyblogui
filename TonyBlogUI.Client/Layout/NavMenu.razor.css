@@ -41,10 +41,12 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' class='bi bi-list-nested' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M4.5 11.5A.5.5 0 0 1 5 11h10a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm-2-4A.5.5 0 0 1 3 7h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm-2-4A.5.5 0 0 1 1 3h10a.5.5 0 0 1 0 1H1a.5.5 0 0 1-.5-.5z'/%3E%3C/svg%3E");
 }
 
-/* Mobile: nav is hidden by default, shown when not collapsed */
+/* Mobile first: nav is hidden by default, shown when not collapsed */
 .nav-scrollable {
     display: block;
     padding: 1rem 0;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
 }
 
 .nav-scrollable.collapse {
@@ -64,7 +66,8 @@
     padding-bottom: 0.5rem;
 }
 
-.nav-item ::deep a {
+.nav-item ::deep a,
+.nav-item ::deep button.nav-link {
     color: rgba(255, 255, 255, 0.8);
     border-radius: 0.5rem;
     height: 2.75rem;
@@ -81,14 +84,24 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.nav-item ::deep a:hover {
+.nav-item ::deep a:hover,
+.nav-item ::deep button.nav-link:hover {
     background-color: rgba(255, 255, 255, 0.15);
     color: white;
     transform: translateX(4px);
 }
 
+/* Responsive utilities */
+.d-md-none {
+    display: block !important;
+}
+
+.d-none {
+    display: none !important;
+}
+
 /* Desktop: always show nav, hide hamburger */
-@media (min-width: 641px) {
+@media (min-width: 768px) {
     .navbar-toggler {
         display: none;
     }
@@ -99,5 +112,9 @@
 
     .nav-scrollable.collapse {
         display: block;
+    }
+
+    .d-md-none {
+        display: none !important;
     }
 }

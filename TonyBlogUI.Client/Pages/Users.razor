@@ -1,0 +1,557 @@
+@page "/users"
+@using Microsoft.AspNetCore.Authorization
+@using TonyBlogUI.Shared
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<PageTitle>Users - Tony Blog UI</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>User Management</h1>
+        <p class="text-secondary mb-0">Manage user accounts and roles.</p>
+    </div>
+    @if (!isEditing && !showAddForm)
+    {
+        <button class="btn btn-primary" @onclick="ShowAddForm">
+            <i class="bi bi-person-plus me-2"></i>Add User
+        </button>
+    }
+</div>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="ClearError"></button>
+    </div>
+}
+
+@if (successMessage != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>
+        @successMessage
+        <button type="button" class="btn-close" @onclick="ClearSuccess"></button>
+    </div>
+}
+
+@if (users == null)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!users.Any())
+{
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-people text-muted" style="font-size: 3rem;"></i>
+            <h5 class="mt-3">No users found</h5>
+            <p class="text-secondary">Get started by adding your first user.</p>
+            <button class="btn btn-primary" @onclick="ShowAddForm">
+                <i class="bi bi-person-plus me-2"></i>Add User
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Roles</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in users)
+                {
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="user-avatar-small">
+                                    @GetUserInitials(user)
+                                </div>
+                                <div>
+                                    <span class="fw-medium">@GetFullName(user)</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>@user.Email</td>
+                        <td>
+                            <div class="d-flex gap-1 flex-wrap">
+                                @foreach (var role in user.Roles)
+                                {
+                                    <span class="role-badge @(role == "Admin" ? "role-admin" : "role-user")">
+                                        @role
+                                    </span>
+                                }
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-secondary" @onclick="() => EditUser(user)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteUser(user)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showAddForm)
+{
+    <div class="form-section">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="mb-0">
+                <i class="bi bi-person-plus me-2"></i>Add New User
+            </h3>
+            <button type="button" class="btn btn-secondary btn-sm" @onclick="CancelEdit">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        
+        <EditForm Model="createRequest" OnValidSubmit="CreateUser" FormName="addUserForm">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">First Name</label>
+                    <InputText class="form-control" @bind-Value="createRequest.FirstName" placeholder="Enter first name" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Last Name</label>
+                    <InputText class="form-control" @bind-Value="createRequest.LastName" placeholder="Enter last name" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Email <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="createRequest.Email" placeholder="user@example.com" />
+                    <ValidationMessage For="@(() => createRequest.Email)" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Password <span class="text-danger">*</span></label>
+                    <InputText type="password" class="form-control" @bind-Value="createRequest.Password" placeholder="Enter password" />
+                    <ValidationMessage For="@(() => createRequest.Password)" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                    <InputText type="password" class="form-control" @bind-Value="createRequest.ConfirmPassword" placeholder="Confirm password" />
+                    <ValidationMessage For="@(() => createRequest.ConfirmPassword)" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Roles <span class="text-danger">*</span></label>
+                    <div class="d-flex gap-3">
+                        @foreach (var role in availableRoles)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="add-role-@role" 
+                                       checked="@createRequest.Roles.Contains(role)"
+                                       @onchange="e => ToggleCreateRole(role, (bool)e.Value!)" />
+                                <label class="form-check-label" for="add-role-@role">@role</label>
+                            </div>
+                        }
+                    </div>
+                    <ValidationMessage For="@(() => createRequest.Roles)" />
+                </div>
+                <div class="col-12">
+                    <hr class="my-3" />
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            <i class="bi bi-person-plus me-2"></i>Create User
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+}
+
+@if (isEditing)
+{
+    <div class="form-section">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="mb-0">
+                <i class="bi bi-pencil-square me-2"></i>Edit User
+            </h3>
+            <button type="button" class="btn btn-secondary btn-sm" @onclick="CancelEdit">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        
+        <EditForm Model="updateRequest" OnValidSubmit="UpdateUser" FormName="editUserForm">
+            <DataAnnotationsValidator />
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">First Name</label>
+                    <InputText class="form-control" @bind-Value="updateRequest.FirstName" placeholder="Enter first name" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Last Name</label>
+                    <InputText class="form-control" @bind-Value="updateRequest.LastName" placeholder="Enter last name" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Email <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="updateRequest.Email" placeholder="user@example.com" />
+                    <ValidationMessage For="@(() => updateRequest.Email)" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">New Password</label>
+                    <InputText type="password" class="form-control" @bind-Value="updateRequest.NewPassword" placeholder="Leave blank to keep current password" />
+                    <div class="form-text">Leave blank to keep the current password</div>
+                    <ValidationMessage For="@(() => updateRequest.NewPassword)" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Roles <span class="text-danger">*</span></label>
+                    <div class="d-flex gap-3">
+                        @foreach (var role in availableRoles)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="edit-role-@role" 
+                                       checked="@updateRequest.Roles.Contains(role)"
+                                       @onchange="e => ToggleUpdateRole(role, (bool)e.Value!)" />
+                                <label class="form-check-label" for="edit-role-@role">@role</label>
+                            </div>
+                        }
+                    </div>
+                    <ValidationMessage For="@(() => updateRequest.Roles)" />
+                </div>
+                <div class="col-12">
+                    <hr class="my-3" />
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            <i class="bi bi-check-lg me-2"></i>Update User
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+}
+
+<style>
+    .user-avatar-small {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: white;
+        text-transform: uppercase;
+    }
+
+    .role-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.625rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .role-admin {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+
+    .role-user {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+
+    .form-section {
+        background-color: var(--surface);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+        margin-top: 1.5rem;
+        border: 1px solid var(--border);
+    }
+
+    .form-text {
+        color: var(--text-muted);
+        font-size: 0.8125rem;
+    }
+
+    .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+
+    .spinner-border-sm {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .btn-group .btn {
+        padding: 0.375rem 0.625rem;
+    }
+</style>
+
+@code {
+    private List<UserDto>? users;
+    private List<string> availableRoles = new() { "Admin", "User" };
+    private CreateUserRequest createRequest = new();
+    private UpdateUserRequest updateRequest = new();
+    private string? editingUserId;
+    private bool isEditing = false;
+    private bool showAddForm = false;
+    private bool isLoading = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+        await LoadRoles();
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            users = await Http.GetFromJsonAsync<List<UserDto>>("api/users");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading users: {ex.Message}");
+            errorMessage = "Failed to load users. Please try again.";
+            users = new List<UserDto>();
+        }
+    }
+
+    private async Task LoadRoles()
+    {
+        try
+        {
+            var roles = await Http.GetFromJsonAsync<List<string>>("api/users/roles");
+            if (roles != null && roles.Any())
+            {
+                availableRoles = roles;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading roles: {ex.Message}");
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        showAddForm = true;
+        isEditing = false;
+        createRequest = new CreateUserRequest { Roles = new List<string> { "User" } };
+        ClearMessages();
+    }
+
+    private void EditUser(UserDto user)
+    {
+        editingUserId = user.Id;
+        updateRequest = new UpdateUserRequest
+        {
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Roles = new List<string>(user.Roles)
+        };
+        isEditing = true;
+        showAddForm = false;
+        ClearMessages();
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        showAddForm = false;
+        createRequest = new();
+        updateRequest = new();
+        editingUserId = null;
+    }
+
+    private void ToggleCreateRole(string role, bool isChecked)
+    {
+        if (isChecked && !createRequest.Roles.Contains(role))
+        {
+            createRequest.Roles.Add(role);
+        }
+        else if (!isChecked && createRequest.Roles.Contains(role))
+        {
+            createRequest.Roles.Remove(role);
+        }
+    }
+
+    private void ToggleUpdateRole(string role, bool isChecked)
+    {
+        if (isChecked && !updateRequest.Roles.Contains(role))
+        {
+            updateRequest.Roles.Add(role);
+        }
+        else if (!isChecked && updateRequest.Roles.Contains(role))
+        {
+            updateRequest.Roles.Remove(role);
+        }
+    }
+
+    private async Task CreateUser()
+    {
+        isLoading = true;
+        ClearMessages();
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/users", createRequest);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "User created successfully.";
+                showAddForm = false;
+                createRequest = new();
+                await LoadUsers();
+            }
+            else
+            {
+                var result = await response.Content.ReadFromJsonAsync<UserResponse>();
+                errorMessage = result?.Message ?? "Failed to create user.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception creating user: {ex.Message}");
+            errorMessage = "An error occurred while creating the user.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task UpdateUser()
+    {
+        if (string.IsNullOrEmpty(editingUserId))
+            return;
+
+        isLoading = true;
+        ClearMessages();
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/users/{editingUserId}", updateRequest);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "User updated successfully.";
+                isEditing = false;
+                updateRequest = new();
+                editingUserId = null;
+                await LoadUsers();
+            }
+            else
+            {
+                var result = await response.Content.ReadFromJsonAsync<UserResponse>();
+                errorMessage = result?.Message ?? "Failed to update user.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception updating user: {ex.Message}");
+            errorMessage = "An error occurred while updating the user.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ConfirmDeleteUser(UserDto user)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete user '{user.Email}'?");
+        if (confirmed)
+        {
+            await DeleteUser(user.Id);
+        }
+    }
+
+    private async Task DeleteUser(string id)
+    {
+        ClearMessages();
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/users/{id}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "User deleted successfully.";
+                await LoadUsers();
+            }
+            else
+            {
+                var result = await response.Content.ReadFromJsonAsync<UserResponse>();
+                errorMessage = result?.Message ?? "Failed to delete user.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception deleting user: {ex.Message}");
+            errorMessage = "An error occurred while deleting the user.";
+        }
+    }
+
+    private void ClearMessages()
+    {
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private void ClearError() => errorMessage = null;
+    private void ClearSuccess() => successMessage = null;
+
+    private string GetUserInitials(UserDto user)
+    {
+        if (!string.IsNullOrEmpty(user.FirstName) && !string.IsNullOrEmpty(user.LastName))
+        {
+            return $"{user.FirstName[0]}{user.LastName[0]}";
+        }
+        return !string.IsNullOrEmpty(user.Email) ? user.Email[0].ToString().ToUpper() : "U";
+    }
+
+    private string GetFullName(UserDto user)
+    {
+        if (!string.IsNullOrEmpty(user.FirstName) || !string.IsNullOrEmpty(user.LastName))
+        {
+            return $"{user.FirstName} {user.LastName}".Trim();
+        }
+        return user.Email;
+    }
+}
