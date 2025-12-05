@@ -272,9 +272,9 @@ Jwt__Key="your-production-secret-key"
 |--------|----------|-------------|---------------|
 | `GET` | `/api/blogs` | Get all keyword clusters | Yes |
 | `GET` | `/api/blogs/{id}` | Get cluster by ID | Yes |
-| `POST` | `/api/blogs` | Create new cluster | Yes |
-| `PUT` | `/api/blogs/{id}` | Update cluster | Yes |
-| `DELETE` | `/api/blogs/{id}` | Delete cluster | Yes |
+| `POST` | `/api/blogs` | Create new cluster | Yes (Admin) |
+| `PUT` | `/api/blogs/{id}` | Update cluster | Yes (Admin) |
+| `DELETE` | `/api/blogs/{id}` | Delete cluster | Yes (Admin) |
 
 ## 📖 API Documentation
 

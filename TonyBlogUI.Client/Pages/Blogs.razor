@@ -1,8 +1,10 @@
 @page "/blogs"
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize]
 @inject HttpClient Http
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @using CsvHelper
 @using CsvHelper.Configuration
 @using System.Globalization
@@ -20,14 +22,17 @@
     @if (!isEditing && !showAddForm)
     {
         <div class="d-flex gap-2">
-            <div class="btn-group">
-                <button class="btn btn-outline-secondary" @onclick="TriggerCsvFileInput">
-                    <i class="bi bi-upload me-2"></i>Import CSV
-                </button>
-                <button class="btn btn-outline-secondary" @onclick="TriggerExcelFileInput">
-                    <i class="bi bi-file-earmark-excel me-2"></i>Import Excel
-                </button>
-            </div>
+            @if (isAdmin)
+            {
+                <div class="btn-group">
+                    <button class="btn btn-outline-secondary" @onclick="TriggerCsvFileInput">
+                        <i class="bi bi-upload me-2"></i>Import CSV
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="TriggerExcelFileInput">
+                        <i class="bi bi-file-earmark-excel me-2"></i>Import Excel
+                    </button>
+                </div>
+            }
             @if (blogs != null && blogs.Any())
             {
                 <div class="btn-group">
@@ -39,9 +44,12 @@
                     </button>
                 </div>
             }
-            <button class="btn btn-primary" @onclick="ShowAddForm">
-                <i class="bi bi-plus-lg me-2"></i>Add New
-            </button>
+            @if (isAdmin)
+            {
+                <button class="btn btn-primary" @onclick="ShowAddForm">
+                    <i class="bi bi-plus-lg me-2"></i>Add New
+                </button>
+            }
         </div>
     }
 </div>
@@ -73,9 +81,12 @@ else if (!blogs.Any())
             <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
             <h5 class="mt-3">No keyword clusters found</h5>
             <p class="text-secondary">Get started by adding your first keyword cluster.</p>
-            <button class="btn btn-primary" @onclick="ShowAddForm">
-                <i class="bi bi-plus-lg me-2"></i>Add Keyword Cluster
-            </button>
+            @if (isAdmin)
+            {
+                <button class="btn btn-primary" @onclick="ShowAddForm">
+                    <i class="bi bi-plus-lg me-2"></i>Add Keyword Cluster
+                </button>
+            }
         </div>
     </div>
 }
@@ -91,7 +102,10 @@ else
                     <th>Primary Keyword</th>
                     <th>Status</th>
                     <th>URL</th>
-                    <th class="text-end">Actions</th>
+                    @if (isAdmin)
+                    {
+                        <th class="text-end">Actions</th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -143,16 +157,19 @@ else
                                 <span class="text-muted">—</span>
                             }
                         </td>
-                        <td class="text-end">
-                            <div class="btn-group">
-                                <button type="button" class="btn btn-sm btn-secondary" @onclick="() => EditBlog(blog)">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteBlog(blog)">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </td>
+                        @if (isAdmin)
+                        {
+                            <td class="text-end">
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-sm btn-secondary" @onclick="() => EditBlog(blog)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteBlog(blog)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        }
                     </tr>
                 }
             </tbody>
@@ -160,7 +177,7 @@ else
     </div>
 }
 
-@if (showAddForm)
+@if (showAddForm && isAdmin)
 {
     <div class="form-section">
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -219,7 +236,7 @@ else
     </div>
 }
 
-@if (isEditing)
+@if (isEditing && isAdmin)
 {
     <div class="form-section">
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -375,6 +392,7 @@ else
     private bool showAddForm = false;
     private string? importMessage = null;
     private bool importSuccess = false;
+    private bool isAdmin = false;
 
     // CSV record class with Id as first field
     private class BlogCsvRecord
@@ -390,11 +408,14 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdmin = authState.User.IsInRole("Admin");
         await LoadBlogs();
     }
 
     private void ShowAddForm()
     {
+        if (!isAdmin) return;
         showAddForm = true;
         isEditing = false;
         newBlog = new();
@@ -403,11 +424,13 @@ else
 
     private async Task TriggerCsvFileInput()
     {
+        if (!isAdmin) return;
         await JS.InvokeVoidAsync("triggerFileInput", "csvFileInput");
     }
 
     private async Task TriggerExcelFileInput()
     {
+        if (!isAdmin) return;
         await JS.InvokeVoidAsync("triggerFileInput", "excelFileInput");
     }
 
@@ -418,6 +441,8 @@ else
 
     private async Task ImportFromExcel(InputFileChangeEventArgs e)
     {
+        if (!isAdmin) return;
+        
         try
         {
             var file = e.File;
@@ -556,6 +581,8 @@ else
 
     private async Task ImportFromCsv(InputFileChangeEventArgs e)
     {
+        if (!isAdmin) return;
+        
         try
         {
             var file = e.File;
@@ -650,6 +677,8 @@ else
 
     private async Task AddBlog()
     {
+        if (!isAdmin) return;
+        
         try
         {
             newBlog.Keywords = keywordsInput.Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -676,6 +705,8 @@ else
 
     private void EditBlog(Blog blog)
     {
+        if (!isAdmin) return;
+        
         editBlog = new Blog
         {
             Id = blog.Id,
@@ -693,6 +724,8 @@ else
 
     private async Task UpdateBlog()
     {
+        if (!isAdmin) return;
+        
         try
         {
             editBlog.Keywords = editKeywordsInput.Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -729,6 +762,8 @@ else
 
     private async Task ConfirmDeleteBlog(Blog blog)
     {
+        if (!isAdmin) return;
+        
         var confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{blog.ClusterName}'?");
         if (confirmed)
         {
@@ -738,6 +773,8 @@ else
 
     private async Task DeleteBlog(string id)
     {
+        if (!isAdmin) return;
+        
         try
         {
             var response = await Http.DeleteAsync($"api/blogs/{id}");

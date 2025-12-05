@@ -61,9 +61,10 @@ public class BlogsController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new blog
+    /// Creates a new blog (Admin only)
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<Blog>> Create([FromBody] Blog blog)
     {
         if (blog == null)
@@ -81,9 +82,10 @@ public class BlogsController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing blog
+    /// Updates an existing blog (Admin only)
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> Update(string id, [FromBody] Blog blog)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -109,9 +111,10 @@ public class BlogsController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a blog by ID
+    /// Deletes a blog by ID (Admin only)
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> Delete(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
