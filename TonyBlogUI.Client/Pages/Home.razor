@@ -1,0 +1,91 @@
+@page "/"
+
+<PageTitle>Home - Tony Blog UI</PageTitle>
+
+<div class="mb-4">
+    <h1>Welcome to Tony Blog UI</h1>
+    <p class="text-secondary">Manage your keyword clusters with ease using Google Sheets as your backend.</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="icon-box bg-primary-light me-3">
+                        <i class="bi bi-collection text-primary"></i>
+                    </div>
+                    <h5 class="card-title mb-0">Keyword Clusters</h5>
+                </div>
+                <p class="card-text">View and manage all your keyword clusters, intents, and primary keywords in one place.</p>
+                <a href="blogs" class="btn btn-primary">
+                    <i class="bi bi-arrow-right-circle me-2"></i>Go to Blogs
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="icon-box bg-success-light me-3">
+                        <i class="bi bi-cloud-check text-success"></i>
+                    </div>
+                    <h5 class="card-title mb-0">Google Sheets Backend</h5>
+                </div>
+                <p class="card-text">All your data is stored securely in Google Sheets, making it easy to collaborate and backup.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="icon-box bg-warning-light me-3">
+                        <i class="bi bi-lightning-charge text-warning"></i>
+                    </div>
+                    <h5 class="card-title mb-0">Real-time Updates</h5>
+                </div>
+                <p class="card-text">Changes sync instantly with your Google Sheet. Edit here or directly in Sheets.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .icon-box {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+    
+    .bg-primary-light {
+        background-color: var(--primary-light);
+    }
+    
+    .bg-success-light {
+        background-color: #dcfce7;
+    }
+    
+    .bg-warning-light {
+        background-color: #fef3c7;
+    }
+    
+    .text-primary {
+        color: var(--primary) !important;
+    }
+    
+    .text-success {
+        color: var(--success) !important;
+    }
+    
+    .text-warning {
+        color: var(--warning) !important;
+    }
+</style>
