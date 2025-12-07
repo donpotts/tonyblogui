@@ -168,6 +168,21 @@ builder.Services.AddSingleton<GoogleSheetsService>(sp =>
         ?? throw new InvalidOperationException("GoogleSheets:Credentials is not configured. Add it to User Secrets or appsettings.json");
     var spreadsheetId = configuration["GoogleSheets:SpreadsheetId"] 
         ?? throw new InvalidOperationException("GoogleSheets:SpreadsheetId is not configured. Add it to User Secrets or appsettings.json");
+    
+    // Support Base64-encoded credentials for Azure App Service
+    // If credentials don't start with '{', assume they're Base64-encoded
+    if (!credentials.TrimStart().StartsWith('{'))
+    {
+        try
+        {
+            var decodedBytes = Convert.FromBase64String(credentials);
+            credentials = System.Text.Encoding.UTF8.GetString(decodedBytes);
+        }
+        catch (FormatException)
+        {
+            // Not Base64, might be a file path - let GoogleSheetsService handle it
+        }
+    }
         
     return new GoogleSheetsService(credentials, spreadsheetId);
 });
